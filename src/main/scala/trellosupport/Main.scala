@@ -15,8 +15,6 @@ object Main extends App {
   val token = sys.env("token")
   val boardId = "3cFFCcj4"
 
-  case class DateRange(start: LocalDate, end: LocalDate)
-
   case class Week(beginning: LocalDate)
 
   def allCards(): Seq[Card] =
@@ -36,9 +34,9 @@ object Main extends App {
       .pipe(read[Seq[Action]](_, trace = true))
       .filter(_.`type` == "updateCard")
 
-  def p1s(card: Card): Boolean = card.labels.exists(_.name == "P1")
-  def p2s(card: Card): Boolean = card.labels.exists(_.name == "P2")
-  def p3s(card: Card): Boolean = card.labels.exists(_.name == "P3")
+  def isP1(card: Card): Boolean = card.labels.exists(_.name == "P1")
+  def isP2(card: Card): Boolean = card.labels.exists(_.name == "P2")
+  def isP3(card: Card): Boolean = card.labels.exists(_.name == "P3")
 
   def doneAction(actions: Seq[Action]): Option[Action] =
     actions.find(_.data.listAfter.exists(_.name.startsWith("Done ")))
@@ -70,9 +68,9 @@ object Main extends App {
   }
 
   println("=== P1 ===")
-  show(p1s)
+  show(isP1)
   println("=== P2 ===")
-  show(p2s)
+  show(isP2)
   println("=== P3 ===")
-  show(p3s)
+  show(isP3)
 }
