@@ -50,8 +50,22 @@ object Trello {
 
     implicit val actionReader: Reader[Action] = macroR
 
-    def isMoveToDoing(action: Action): Boolean = action.data.listAfter.exists(_.name == "Doing")
-    def isMoveToDone(action: Action): Boolean =
-      action.data.listAfter.exists(_.name.startsWith("Done "))
+    private def whenMoved(action: Action, p: Action => Boolean): Option[ZonedDateTime] =
+      if (p(action)) Some(action.date)
+      else None
+
+    private def isMoveTo(action: Action, p: List => Boolean): Boolean =
+      action.data.listAfter.exists(p)
+
+    private def isMoveToDoing(action: Action): Boolean = isMoveTo(action, _.name == "Doing")
+
+    // TODO if not moved to doing, take creation time instead. See https://help.trello.com/article/759-getting-the-time-a-card-or-board-was-created
+    def whenMovedToDoing(action: Action): Option[ZonedDateTime] =
+      whenMoved(action, isMoveToDoing)
+
+    def isMoveToDone(action: Action): Boolean = isMoveTo(action, _.name.startsWith("Done "))
+
+    def whenMovedToDone(action: Action): Option[ZonedDateTime] =
+      whenMoved(action, isMoveToDone)
   }
 }
