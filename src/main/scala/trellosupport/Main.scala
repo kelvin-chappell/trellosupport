@@ -1,76 +1,32 @@
 package trellosupport
 
-import scalaj.http.Http
-import trellosupport.Trello._
-import upickle.default._
+import trellosupport.model.Trello.Card.{isP1, isP2, isP3}
+import trellosupport.model.Trello._
+import trellosupport.model.{CardWithWeekDone, ReportRow, Week}
+import trellosupport.service.{Trello, TrelloLive}
+import zio._
 
-import java.time.DayOfWeek.MONDAY
-import java.time.LocalDate
-import java.time.temporal.TemporalAdjusters.previous
-import scala.util.chaining.scalaUtilChainingOps
+object Main extends ZIOAppDefault {
 
-object Main extends App {
+  private def refineWithWeekDone(card: Card): ZIO[Has[Trello], Failure, CardWithWeekDone] =
+    for {
+      history <- Trello.cardMovementHistory(card)
+    } yield CardWithWeekDone(card, weekDone = Week.done(history))
 
-  val key = sys.env("key")
-  val token = sys.env("token")
-  val boardId = "3cFFCcj4"
+  private val program: ZIO[Has[Trello] with Has[Console], Failure, Unit] =
+    for {
+      allCards <- Trello.allCards
+      cards <- ZIO.foreach(allCards.filter(card => isP1(card) || isP2(card) || isP3(card)))(
+        refineWithWeekDone
+      )
+      _ <- Console.printLine("Week,P1Count,P2Count,P3Count").mapError(Failure.fromThrowable)
+      _ <- ZIO
+        .foreachDiscard(ReportRow.fromCards(cards)) { row =>
+          Console.printLine(s"${row.week.beginning},${row.p1Count},${row.p2Count},${row.p3Count}")
+        }
+        .mapError(Failure.fromThrowable)
+    } yield ()
 
-  case class Week(beginning: LocalDate)
-
-  def allCards(): Seq[Card] =
-    Http(s"https://api.trello.com/1/boards/$boardId/cards/all")
-      .param("key", key)
-      .param("token", token)
-      .asString
-      .body
-      .pipe(read[Seq[Card]](_))
-
-  def cardMovementHistory(card: Card): Seq[Action] =
-    Http(s"https://api.trello.com/1/cards/${card.id}/actions")
-      .param("key", key)
-      .param("token", token)
-      .asString
-      .body
-      .pipe(read[Seq[Action]](_, trace = true))
-      .filter(_.`type` == "updateCard")
-
-  def isP1(card: Card): Boolean = card.labels.exists(_.name == "P1")
-  def isP2(card: Card): Boolean = card.labels.exists(_.name == "P2")
-  def isP3(card: Card): Boolean = card.labels.exists(_.name == "P3")
-
-  def doneAction(actions: Seq[Action]): Option[Action] =
-    actions.find(_.data.listAfter.exists(_.name.startsWith("Done ")))
-
-  def doneWeek(card: Card, history: Card => Seq[Action]): Option[Week] = {
-    def week(date: LocalDate): Week = {
-      if (date.getDayOfWeek == MONDAY) Week(date)
-      else Week(date.`with`(previous(MONDAY)))
-    }
-    doneAction(history(card)).map(action => week(action.date.toLocalDate))
-  }
-
-  def groupedByDoneWeek(
-      cards: Seq[Card],
-      history: Card => Seq[Action]
-  ): Map[Option[Week], Seq[Card]] =
-    cards.groupBy(doneWeek(_, history))
-
-  val cards = allCards()
-
-  def show(p: Card => Boolean): Unit = {
-    groupedByDoneWeek(cards.filter(p), cardMovementHistory).toSeq
-      .sortBy { case (date, _) => date.toString }
-      .foreach { case (date, cards) =>
-        println(s"$date: ${cards.length}")
-        cards.foreach(card => println(card.name))
-        println()
-      }
-  }
-
-  println("=== P1 ===")
-  show(isP1)
-  println("=== P2 ===")
-  show(isP2)
-  println("=== P3 ===")
-  show(isP3)
+  def run: ZIO[zio.ZEnv with Has[ZIOAppArgs], Any, Any] =
+    program.injectCustom(Config.load.toLayer, TrelloLive.layer)
 }

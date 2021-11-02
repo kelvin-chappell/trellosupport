@@ -1,9 +1,9 @@
-package trellosupport
+package trellosupport.model
 
 import ujson.Null
 import upickle.default._
 
-import java.time.LocalDateTime
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter.ISO_DATE_TIME
 
 object Trello {
@@ -18,6 +18,9 @@ object Trello {
 
   object Card {
     implicit val reader: Reader[Card] = macroR
+    def isP1(card: Card): Boolean = card.labels.exists(_.name == "P1")
+    def isP2(card: Card): Boolean = card.labels.exists(_.name == "P2")
+    def isP3(card: Card): Boolean = card.labels.exists(_.name == "P3")
   }
 
   case class List(id: String, name: String)
@@ -38,13 +41,17 @@ object Trello {
     implicit val movementReader: Reader[Movement] = macroR
   }
 
-  case class Action(id: String, `type`: String, date: LocalDateTime, data: Movement)
+  case class Action(id: String, `type`: String, date: ZonedDateTime, data: Movement)
 
   object Action {
 
-    implicit val timeReader: Reader[LocalDateTime] =
-      reader[String].map[LocalDateTime](LocalDateTime.parse(_, ISO_DATE_TIME))
+    implicit val timeReader: Reader[ZonedDateTime] =
+      reader[String].map[ZonedDateTime](ZonedDateTime.parse(_, ISO_DATE_TIME))
 
     implicit val actionReader: Reader[Action] = macroR
+
+    def isMoveToDoing(action: Action): Boolean = action.data.listAfter.exists(_.name == "Doing")
+    def isMoveToDone(action: Action): Boolean =
+      action.data.listAfter.exists(_.name.startsWith("Done "))
   }
 }
