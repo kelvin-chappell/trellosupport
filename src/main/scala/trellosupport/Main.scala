@@ -8,17 +8,22 @@ import zio._
 
 object Main extends ZIOAppDefault {
 
-  private def refineWithWeekDone(card: Card): ZIO[Has[Trello], Failure, Option[CompletedCard]] =
-    Trello.cardMovementHistory(card).map(CompletedCard.fromHistory(card))
+  private def refineWithWeekDone(doingList: List)(
+      card: Card
+  ): ZIO[Has[Trello], Failure, Option[CompletedCard]] =
+    Trello.cardMovementHistory(card).map(CompletedCard.fromHistory(doingList, card))
 
   private val program: ZIO[Has[Trello] with Has[Console], Failure, Unit] =
     for {
+      maybeDoingList <- Trello.allLists.map(_.find(_.name == "Doing"))
+      doingList <- ZIO.fromOption(maybeDoingList).orElseFail(Failure("No Doing list"))
       allCards <- Trello.allCards
       cards <- ZIO
         .foreachPar(allCards.filter(card => isP1(card) || isP2(card) || isP3(card)))(
-          refineWithWeekDone
+          refineWithWeekDone(doingList)
         )
         .map(_.flatten)
+        .debug("refined")
       _ <- Console
         .printLine("Week,P1Count,P1Duration,P2Count,P2Duration,P3Count,P3Duration,TotDuration")
         .mapError(Failure.fromThrowable)

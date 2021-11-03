@@ -14,14 +14,17 @@ object Trello {
     implicit val reader: Reader[Label] = macroR
   }
 
-  case class Card(id: String, name: String, labels: Seq[Label])
+  case class Card(id: String, idList: String, name: String, labels: Seq[Label])
 
   object Card {
     implicit val reader: Reader[Card] = macroR
 
-    def isP1(card: Card): Boolean = card.labels.exists(_.name == "P1")
-    def isP2(card: Card): Boolean = card.labels.exists(_.name == "P2")
-    def isP3(card: Card): Boolean = card.labels.exists(_.name == "P3")
+    private def hasLabel(card: Card, p: Label => Boolean): Boolean = card.labels.exists(p)
+    private def hasPriority(card: Card, priority: Int): Boolean =
+      hasLabel(card, _.name == s"P$priority")
+    def isP1(card: Card): Boolean = hasPriority(card, 1)
+    def isP2(card: Card): Boolean = hasPriority(card, 2)
+    def isP3(card: Card): Boolean = hasPriority(card, 3)
 
     // See https://help.trello.com/article/759-getting-the-time-a-card-or-board-was-created
     def whenCreated(card: Card): ZonedDateTime = {
@@ -36,7 +39,7 @@ object Trello {
     implicit val reader: Reader[List] = macroR
   }
 
-  case class Movement(listAfter: Option[List] = None)
+  case class Movement(listBefore: Option[List] = None, listAfter: Option[List] = None)
 
   object Movement {
 
@@ -64,14 +67,14 @@ object Trello {
     private def isMoveTo(action: Action, p: List => Boolean): Boolean =
       action.data.listAfter.exists(p)
 
-    private def isMoveToDoing(action: Action): Boolean = isMoveTo(action, _.name == "Doing")
+    private def isMoveToDoingList(action: Action): Boolean = isMoveTo(action, _.name == "Doing")
 
-    def isMoveToDone(action: Action): Boolean = isMoveTo(action, _.name.startsWith("Done "))
+    def isMoveToDoneList(action: Action): Boolean = isMoveTo(action, _.name.startsWith("Done "))
 
-    def whenMovedToDoing(action: Action): Option[ZonedDateTime] =
-      whenMoved(action, isMoveToDoing)
+    def whenMovedToDoingList(action: Action): Option[ZonedDateTime] =
+      whenMoved(action, isMoveToDoingList)
 
-    def whenMovedToDone(action: Action): Option[ZonedDateTime] =
-      whenMoved(action, isMoveToDone)
+    def whenMovedToDoneList(action: Action): Option[ZonedDateTime] =
+      whenMoved(action, isMoveToDoneList)
   }
 }

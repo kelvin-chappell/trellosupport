@@ -21,5 +21,5 @@ object Week {
   }
 
   private def done(history: Seq[Action]): Option[Week] =
-    history.find(Action.isMoveToDone).map(action => Week.forDate(action.date.toLocalDate))
+    history.find(Action.isMoveToDoneList).map(action => Week.forDate(action.date.toLocalDate))
 }
