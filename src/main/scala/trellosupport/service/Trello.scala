@@ -30,7 +30,6 @@ object TrelloLive {
                 .param("token", config.token)
                 .asString
             )
-            .debug("card")
             .mapError(Failure.fromThrowable)
           cards <- IO.attempt(read[Seq[Card]](response.body)).mapError(Failure.fromThrowable)
         } yield cards
@@ -44,7 +43,6 @@ object TrelloLive {
                 .param("token", config.token)
                 .asString
             )
-            .debug("history")
             .mapError(Failure.fromThrowable)
           actions <- IO
             .attempt(

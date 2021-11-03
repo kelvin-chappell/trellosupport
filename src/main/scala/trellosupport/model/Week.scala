@@ -3,7 +3,7 @@ package trellosupport.model
 import trellosupport.model.Trello.Action
 
 import java.time.DayOfWeek.MONDAY
-import java.time.LocalDate
+import java.time.{LocalDate, ZonedDateTime}
 import java.time.temporal.TemporalAdjusters.previous
 
 case class Week(beginning: LocalDate)
@@ -15,6 +15,11 @@ object Week {
     else Week(date.`with`(previous(MONDAY)))
   }
 
-  def done(history: Seq[Action]): Option[Week] =
+  def forTime(time: ZonedDateTime): Week = {
+    if (time.getDayOfWeek == MONDAY) Week(time.toLocalDate)
+    else Week(time.toLocalDate.`with`(previous(MONDAY)))
+  }
+
+  private def done(history: Seq[Action]): Option[Week] =
     history.find(Action.isMoveToDone).map(action => Week.forDate(action.date.toLocalDate))
 }

@@ -3,7 +3,7 @@ package trellosupport.model
 import ujson.Null
 import upickle.default._
 
-import java.time.ZonedDateTime
+import java.time.{Instant, ZoneId, ZonedDateTime}
 import java.time.format.DateTimeFormatter.ISO_DATE_TIME
 
 object Trello {
@@ -18,9 +18,16 @@ object Trello {
 
   object Card {
     implicit val reader: Reader[Card] = macroR
+
     def isP1(card: Card): Boolean = card.labels.exists(_.name == "P1")
     def isP2(card: Card): Boolean = card.labels.exists(_.name == "P2")
     def isP3(card: Card): Boolean = card.labels.exists(_.name == "P3")
+
+    // See https://help.trello.com/article/759-getting-the-time-a-card-or-board-was-created
+    def whenCreated(card: Card): ZonedDateTime = {
+      val epochSecond = Integer.parseInt(card.id.take(8), 16)
+      ZonedDateTime.ofInstant(Instant.ofEpochSecond(epochSecond), ZoneId.of("UTC"))
+    }
   }
 
   case class List(id: String, name: String)
@@ -59,11 +66,10 @@ object Trello {
 
     private def isMoveToDoing(action: Action): Boolean = isMoveTo(action, _.name == "Doing")
 
-    // TODO if not moved to doing, take creation time instead. See https://help.trello.com/article/759-getting-the-time-a-card-or-board-was-created
+    def isMoveToDone(action: Action): Boolean = isMoveTo(action, _.name.startsWith("Done "))
+
     def whenMovedToDoing(action: Action): Option[ZonedDateTime] =
       whenMoved(action, isMoveToDoing)
-
-    def isMoveToDone(action: Action): Boolean = isMoveTo(action, _.name.startsWith("Done "))
 
     def whenMovedToDone(action: Action): Option[ZonedDateTime] =
       whenMoved(action, isMoveToDone)
